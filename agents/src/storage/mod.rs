@@ -1,4 +1,5 @@
 pub mod message_content;
+pub mod spec_schemas;
 pub mod sqlite;
 
 use async_trait::async_trait;
@@ -19,6 +20,9 @@ pub enum AgentType {
     FrontendEngineer,
     ProductOwner,
     EngineeringManager,
+    /// Generates `nocodo_praxis` spec code from structured PO notes.
+    /// Tasks assigned to this agent carry a `PraxisWriterTaskSpec` in their description.
+    PraxisEngineer,
 }
 
 impl AgentType {
@@ -31,6 +35,7 @@ impl AgentType {
             "frontend_engineer" => AgentType::FrontendEngineer,
             "product_owner" => AgentType::ProductOwner,
             "engineering_manager" => AgentType::EngineeringManager,
+            "praxis_engineer" => AgentType::PraxisEngineer,
             _ => AgentType::ProjectManager,
         }
     }
@@ -44,6 +49,7 @@ impl AgentType {
             AgentType::FrontendEngineer => "frontend_engineer",
             AgentType::ProductOwner => "product_owner",
             AgentType::EngineeringManager => "engineering_manager",
+            AgentType::PraxisEngineer => "praxis_engineer",
         }
     }
 }
@@ -202,6 +208,7 @@ pub struct UserChatSessionRow {
     pub project_id: i64,
     pub created_by_user_id: i64,
     pub status: String,
+    pub session_type: String,
     pub created_at: i64,
     pub updated_at: i64,
     pub completed_at: Option<i64>,
@@ -296,7 +303,9 @@ pub trait TaskStorage: Send + Sync {
     async fn list_pending_review_tasks(&self, project_id: i64) -> Result<Vec<Task>, AgentError>;
 
     /// All open tasks across every project that have no agent session yet and are
-    /// not assigned to project_manager. Used by the startup reconciliation pass.
+    /// eligible for automatic specialist dispatch. Used by the startup reconciliation
+    /// pass. Admin-triggered agents such as `praxis_engineer` are intentionally
+    /// excluded by the storage implementation.
     async fn list_open_dispatchable_tasks(&self) -> Result<Vec<Task>, AgentError>;
 
     async fn create_epic(&self, epic: Epic) -> Result<i64, AgentError>;
@@ -465,7 +474,12 @@ pub trait UserStorage: Send + Sync {
 
 #[async_trait]
 pub trait UserChatStorage: Send + Sync {
-    async fn create_session(&self, project_id: i64, user_id: i64) -> Result<i64, AgentError>;
+    async fn create_session(
+        &self,
+        project_id: i64,
+        user_id: i64,
+        session_type: &str,
+    ) -> Result<i64, AgentError>;
 
     async fn get_session(&self, session_id: i64) -> Result<Option<UserChatSessionRow>, AgentError>;
 
@@ -573,14 +587,17 @@ pub struct ProjectNoteRow {
 
 #[async_trait]
 pub trait ProjectNoteStorage: Send + Sync {
-    /// replaces_note: exact text of the current note this supersedes (None for new notes).
-    /// Errors if replaces_note text not found, or if new note text already exists as a current note.
+    /// replaces_note_id: id of the current note this supersedes.
+    /// replaces_note: exact text of the current note this supersedes, retained for
+    /// compatibility when callers do not have an id.
+    /// Errors if replacement target is not found, or if new note text already exists as a current note.
     async fn add_note(
         &self,
         project_id: i64,
         topic: ProjectNoteTopic,
         note: String,
         source_session_id: Option<i64>,
+        replaces_note_id: Option<i64>,
         replaces_note: Option<String>,
     ) -> Result<i64, AgentError>;
 

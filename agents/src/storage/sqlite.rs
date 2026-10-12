@@ -417,6 +417,7 @@ impl TaskStorage for SqliteTaskStorage {
                     ON s.task_id = t.id AND s.agent_type = t.assigned_to_agent
              WHERE t.status = 'ready'
                AND t.assigned_to_agent != 'project_manager'
+               AND t.assigned_to_agent != 'praxis_engineer'
                AND s.id IS NULL
              ORDER BY t.id ASC",
         )?;
@@ -864,10 +865,11 @@ fn map_user_chat_session_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<UserCh
         project_id: row.get(1)?,
         created_by_user_id: row.get(2)?,
         status: row.get(3)?,
-        created_at: row.get(4)?,
-        updated_at: row.get(5)?,
-        completed_at: row.get(6)?,
-        handoff_session_id: row.get(7)?,
+        session_type: row.get(4)?,
+        created_at: row.get(5)?,
+        updated_at: row.get(6)?,
+        completed_at: row.get(7)?,
+        handoff_session_id: row.get(8)?,
     })
 }
 
@@ -887,13 +889,18 @@ fn map_user_chat_message_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<UserCh
 
 #[async_trait]
 impl UserChatStorage for SqliteUserChatStorage {
-    async fn create_session(&self, project_id: i64, user_id: i64) -> Result<i64, AgentError> {
+    async fn create_session(
+        &self,
+        project_id: i64,
+        user_id: i64,
+        session_type: &str,
+    ) -> Result<i64, AgentError> {
         let ts = now();
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "INSERT INTO user_chat_session (project_id, created_by_user_id, status, created_at, updated_at)
-             VALUES (?1, ?2, 'open', ?3, ?4)",
-            params![project_id, user_id, ts, ts],
+            "INSERT INTO user_chat_session (project_id, created_by_user_id, status, session_type, created_at, updated_at)
+             VALUES (?1, ?2, 'open', ?3, ?4, ?5)",
+            params![project_id, user_id, session_type, ts, ts],
         )?;
         Ok(conn.last_insert_rowid())
     }
@@ -902,7 +909,7 @@ impl UserChatStorage for SqliteUserChatStorage {
         let conn = self.conn.lock().unwrap();
         let session = conn
             .query_row(
-                "SELECT id, project_id, created_by_user_id, status, created_at, updated_at, completed_at, handoff_session_id
+                "SELECT id, project_id, created_by_user_id, status, session_type, created_at, updated_at, completed_at, handoff_session_id
                  FROM user_chat_session WHERE id = ?1 LIMIT 1",
                 params![session_id],
                 map_user_chat_session_row,
@@ -1289,6 +1296,7 @@ impl ProjectNoteStorage for SqliteProjectNoteStorage {
         topic: ProjectNoteTopic,
         note: String,
         source_session_id: Option<i64>,
+        replaces_note_id: Option<i64>,
         replaces_note: Option<String>,
     ) -> Result<i64, AgentError> {
         let ts = now();
@@ -1309,8 +1317,29 @@ impl ProjectNoteStorage for SqliteProjectNoteStorage {
             )));
         }
 
-        // Resolve replaces_note text → replaces_id.
-        let replaces_id: Option<i64> = if let Some(ref replaces_text) = replaces_note {
+        // Resolve replacement target. Prefer stable ids when available; retain
+        // exact-text replacement for older prompts/tools.
+        let replaces_id: Option<i64> = if let Some(note_id) = replaces_note_id {
+            let id: Option<i64> = conn
+                .query_row(
+                    "SELECT pn.id FROM project_note pn
+                     LEFT JOIN project_note newer ON newer.replaces_id = pn.id
+                     WHERE pn.project_id = ?1 AND pn.id = ?2 AND newer.id IS NULL
+                     LIMIT 1",
+                    params![project_id, note_id],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            match id {
+                Some(id) => Some(id),
+                None => {
+                    return Err(AgentError::Other(format!(
+                        "No current note with id {} found for project {}.",
+                        note_id, project_id
+                    )));
+                }
+            }
+        } else if let Some(ref replaces_text) = replaces_note {
             let id: Option<i64> = conn
                 .query_row(
                     "SELECT pn.id FROM project_note pn

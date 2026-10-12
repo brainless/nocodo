@@ -1,0 +1,8 @@
+[package]
+name = "nocodo_praxis"
+version = "0.1.0"
+edition = "2021"
+description = "Provenance-aware vocabulary crate for requirement-driven systems"
+license = "MIT"
+
+[dependencies]

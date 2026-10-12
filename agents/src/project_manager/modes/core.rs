@@ -34,6 +34,7 @@ breaking work into tasks:
 | backend_engineer  | Implement backend API endpoints                 |
 | frontend_engineer | Build SolidJS UI components                     |
 | ui_designer       | Design UI mockups and wireframes                |
+| praxis_engineer   | Generate `nocodo_praxis` spec code (personas, permissions, roles, state machines) |
 
 Only assign tasks to agents listed above.
 

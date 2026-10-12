@@ -1,12 +1,13 @@
 use crate::agents_api::state::AgentState;
 use actix_web::{get, post, web, HttpResponse, Responder};
 use nocodo_agents::{
-    build_project_manager, AgentConfig, AgentStorage, AgentType, CommentStorage,
-    FinalizeSessionParams, MessageContent, PmUserSessionResult, PoSessionResult, ProductOwnerAgent,
-    ProjectNoteStorage, SqliteAgentStorage, SqliteCommentStorage, SqliteProjectNoteStorage,
-    SqliteTaskStorage, SqliteUserChatStorage, SqliteUserStorage, StructuredQuestion,
-    StructuredResponse, TaskStorage, UserChatMessageRow, UserChatSessionRow, UserChatStorage,
-    UserStorage,
+    build_project_manager, find_gaps_from_persona_notes, gaps_to_questions, AgentConfig,
+    AgentStorage, AgentType, CommentStorage, FinalizeSessionParams, GapQuestion, MessageContent,
+    PersonaNote, PmUserSessionResult, PoMode, PoSessionResult, PraxisWriterTaskSpec,
+    ProductOwnerAgent, ProjectNoteStorage, SpecGap, SpecNoteContent, SqliteAgentStorage,
+    SqliteCommentStorage, SqliteProjectNoteStorage, SqliteTaskStorage, SqliteUserChatStorage,
+    SqliteUserStorage, StructuredQuestion, StructuredResponse, TaskStorage, UserChatMessageRow,
+    UserChatSessionRow, UserChatStorage, UserStorage,
 };
 use serde::Deserialize;
 use serde::Serialize;
@@ -37,6 +38,22 @@ fn merge_consecutive_roles(messages: Vec<(String, String)>) -> Vec<(String, Stri
         }
     }
     result
+}
+
+fn has_unanswered_structured_questions(messages: &[UserChatMessageRow]) -> bool {
+    let answered_ids: std::collections::HashSet<i64> = messages
+        .iter()
+        .filter(|m| m.content_type == "structured_response")
+        .filter_map(|m| {
+            serde_json::from_str::<serde_json::Value>(&m.content)
+                .ok()
+                .and_then(|v| v["question_message_id"].as_i64())
+        })
+        .collect();
+
+    messages
+        .iter()
+        .any(|m| m.content_type == "structured_question" && !answered_ids.contains(&m.id))
 }
 
 // ---------------------------------------------------------------------------
@@ -131,7 +148,10 @@ pub async fn create_session(
         }
     };
 
-    let session_id = match chat_storage.create_session(body.project_id, user_id).await {
+    let session_id = match chat_storage
+        .create_session(body.project_id, user_id, "intake")
+        .await
+    {
         Ok(id) => id,
         Err(e) => {
             return HttpResponse::InternalServerError().json(serde_json::json!({
@@ -417,7 +437,7 @@ pub async fn list_sessions(
     };
 
     let mut stmt = match conn.prepare(
-        "SELECT id, project_id, created_by_user_id, status, created_at, updated_at, completed_at, handoff_session_id \
+        "SELECT id, project_id, created_by_user_id, status, session_type, created_at, updated_at, completed_at, handoff_session_id \
          FROM user_chat_session WHERE project_id = ?1 ORDER BY created_at DESC",
     ) {
         Ok(s) => s,
@@ -434,10 +454,11 @@ pub async fn list_sessions(
             project_id: row.get(1)?,
             created_by_user_id: row.get(2)?,
             status: row.get(3)?,
-            created_at: row.get(4)?,
-            updated_at: row.get(5)?,
-            completed_at: row.get(6)?,
-            handoff_session_id: row.get(7)?,
+            session_type: row.get(4)?,
+            created_at: row.get(5)?,
+            updated_at: row.get(6)?,
+            completed_at: row.get(7)?,
+            handoff_session_id: row.get(8)?,
         })
     }) {
         Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
@@ -511,43 +532,27 @@ async fn run_po_intake(
         }
     };
 
-    // Detect planning sessions: seeded by PO (first msg is from product_owner).
-    // These should be handled by PM, not PO.
-    let is_planning_session = messages
-        .first()
-        .map(|m| m.author_type == "agent" && m.agent_type.as_deref() == Some("product_owner"))
-        .unwrap_or(false);
-    if is_planning_session {
-        drop(chat_storage);
-        return run_pm_planning(db_path, session_id, chat_notify).await;
-    }
-
-    // Don't fire agents while there are unanswered structured questions.
-    // Agents will run once the user has answered all pending questions.
-    let answered_ids: std::collections::HashSet<i64> = messages
-        .iter()
-        .filter(|m| m.content_type == "structured_response")
-        .filter_map(|m| {
-            serde_json::from_str::<serde_json::Value>(&m.content)
-                .ok()
-                .and_then(|v| v["question_message_id"].as_i64())
-        })
-        .collect();
-    let has_unanswered = messages
-        .iter()
-        .any(|m| m.content_type == "structured_question" && !answered_ids.contains(&m.id));
-    log::info!(
-        "[PO:session={}] answered_ids={:?} has_unanswered={}",
-        session_id,
-        answered_ids,
-        has_unanswered
-    );
-    if has_unanswered {
+    // Don't fire any user-facing agent while there are unanswered structured
+    // questions. Agents run once the user has answered all pending widgets.
+    if has_unanswered_structured_questions(&messages) {
         log::info!(
-            "[PO:session={}] returning early — unanswered questions present",
+            "[user_chat:session={}] returning early — unanswered questions present",
             session_id
         );
         return;
+    }
+
+    // Route by session_type: planning → PM, persona_interview → PO persona interview.
+    // Intake sessions (default) are handled by PO in requirements gathering mode.
+    if session.session_type == "planning" {
+        drop(chat_storage);
+        return run_pm_planning(db_path, session_id, chat_notify).await;
+    }
+    if session.session_type == "persona_interview" {
+        return run_po_persona_interview(db_path, session_id, project_id, chat_notify).await;
+    }
+    if session.session_type == "gap_clarification" {
+        return run_po_gap_clarification(db_path, session_id, project_id, chat_notify).await;
     }
 
     // If PO hasn't spoken yet, store a static greeting now so the user sees it
@@ -667,7 +672,11 @@ async fn run_po_intake(
         session_id
     );
     let po_result = po
-        .respond_in_session(session_id, llm_messages.clone(), false)
+        .respond_in_session(
+            session_id,
+            llm_messages.clone(),
+            PoMode::RequirementsGathering,
+        )
         .await;
     log::info!(
         "[PO:session={}] respond_in_session returned: {:?}",
@@ -701,7 +710,9 @@ async fn run_po_intake(
                 "[PO:session={}] calling respond_in_session (project_naming)",
                 session_id
             );
-            let naming_result = po.respond_in_session(session_id, llm_messages, true).await;
+            let naming_result = po
+                .respond_in_session(session_id, llm_messages, PoMode::ProjectNaming)
+                .await;
             log::info!(
                 "[PO:session={}] project_naming returned: {:?}",
                 session_id,
@@ -712,7 +723,7 @@ async fn run_po_intake(
             );
             match naming_result {
                 Ok(PoSessionResult::Named) | Ok(PoSessionResult::Silent) => {
-                    handle_po_complete(
+                    handle_persona_interview(
                         &db_path,
                         session_id,
                         project_id,
@@ -727,7 +738,7 @@ async fn run_po_intake(
                         "[PO:session={}] unexpected result from project_naming mode",
                         session_id
                     );
-                    handle_po_complete(
+                    handle_persona_interview(
                         &db_path,
                         session_id,
                         project_id,
@@ -791,8 +802,11 @@ async fn run_po_intake(
             }
             notify_session(&chat_notify, session_id).await;
         }
-        Ok(PoSessionResult::Text(_)) | Ok(PoSessionResult::Silent) | Ok(PoSessionResult::Named) => {
-        }
+        Ok(PoSessionResult::Text(_))
+        | Ok(PoSessionResult::Silent)
+        | Ok(PoSessionResult::Named)
+        | Ok(PoSessionResult::PersonaInterviewComplete { .. })
+        | Ok(PoSessionResult::GapClarificationComplete { .. }) => {}
         Err(e) => {
             log::warn!("user_chat: PO error: {}", e);
         }
@@ -846,7 +860,10 @@ async fn handle_po_complete(
     chat_notify: &Arc<Mutex<HashMap<i64, Arc<Notify>>>>,
 ) {
     // Create the planning session for PM.
-    let planning_session_id = match chat_storage.create_session(project_id, user_id).await {
+    let planning_session_id = match chat_storage
+        .create_session(project_id, user_id, "planning")
+        .await
+    {
         Ok(id) => id,
         Err(e) => {
             log::warn!("user_chat: create planning session: {}", e);
@@ -891,6 +908,819 @@ async fn handle_po_complete(
     actix_web::rt::spawn(async move {
         run_pm_planning(db_path, planning_session_id, chat_notify).await;
     });
+}
+
+// ---------------------------------------------------------------------------
+// Persona interview transition: intake → persona interview session
+// ---------------------------------------------------------------------------
+
+async fn handle_persona_interview(
+    db_path: &str,
+    intake_session_id: i64,
+    project_id: i64,
+    user_id: i64,
+    chat_storage: &SqliteUserChatStorage,
+    chat_notify: &Arc<Mutex<HashMap<i64, Arc<Notify>>>>,
+) {
+    // Create the persona interview session for PO.
+    let persona_session_id = match chat_storage
+        .create_session(project_id, user_id, "persona_interview")
+        .await
+    {
+        Ok(id) => id,
+        Err(e) => {
+            log::warn!("user_chat: create persona interview session: {}", e);
+            return;
+        }
+    };
+
+    // Seed with project notes so PO knows which personas were identified.
+    let notes_seed = build_notes_seed(db_path, project_id).await;
+    if let Err(e) = chat_storage
+        .append_message(
+            persona_session_id,
+            "agent",
+            None,
+            Some(AgentType::ProductOwner),
+            None,
+            MessageContent::Text(notes_seed),
+        )
+        .await
+    {
+        log::warn!(
+            "user_chat: store notes seed in persona interview session: {}",
+            e
+        );
+        return;
+    }
+    notify_session(chat_notify, persona_session_id).await;
+
+    // Link intake → persona interview session and close intake.
+    if let Err(e) = chat_storage
+        .set_handoff_session_id(intake_session_id, persona_session_id)
+        .await
+    {
+        log::warn!("user_chat: set handoff_session_id (intake→persona): {}", e);
+        return;
+    }
+    if let Err(e) = chat_storage.complete_session(intake_session_id).await {
+        log::warn!("user_chat: complete intake session: {}", e);
+        return;
+    }
+
+    // Kick off PO in persona interview mode.
+    let db_path = db_path.to_string();
+    let chat_notify = chat_notify.clone();
+    actix_web::rt::spawn(async move {
+        run_po_persona_interview(db_path, persona_session_id, project_id, chat_notify).await;
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Persona interview complete → planning session
+// ---------------------------------------------------------------------------
+
+async fn handle_persona_complete(
+    db_path: &str,
+    persona_session_id: i64,
+    project_id: i64,
+    user_id: i64,
+    chat_storage: &SqliteUserChatStorage,
+    chat_notify: &Arc<Mutex<HashMap<i64, Arc<Notify>>>>,
+) {
+    // Create the planning session for PM.
+    let planning_session_id = match chat_storage
+        .create_session(project_id, user_id, "planning")
+        .await
+    {
+        Ok(id) => id,
+        Err(e) => {
+            log::warn!("user_chat: create planning session: {}", e);
+            return;
+        }
+    };
+
+    // Build seed from project notes (includes persona notes from the interview).
+    let notes_seed = build_notes_seed(db_path, project_id).await;
+    if let Err(e) = chat_storage
+        .append_message(
+            planning_session_id,
+            "agent",
+            None,
+            Some(AgentType::ProductOwner),
+            None,
+            MessageContent::Text(notes_seed),
+        )
+        .await
+    {
+        log::warn!("user_chat: store notes seed in planning session: {}", e);
+        return;
+    }
+    notify_session(chat_notify, planning_session_id).await;
+
+    // Link persona interview → planning session and close persona session.
+    if let Err(e) = chat_storage
+        .set_handoff_session_id(persona_session_id, planning_session_id)
+        .await
+    {
+        log::warn!(
+            "user_chat: set handoff_session_id (persona→planning): {}",
+            e
+        );
+        return;
+    }
+    if let Err(e) = chat_storage.complete_session(persona_session_id).await {
+        log::warn!("user_chat: complete persona interview session: {}", e);
+        return;
+    }
+
+    // Kick off PM in the planning session.
+    let db_path = db_path.to_string();
+    let chat_notify = chat_notify.clone();
+    actix_web::rt::spawn(async move {
+        run_pm_planning(db_path, planning_session_id, chat_notify).await;
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Background task: PO handles persona interview session
+// ---------------------------------------------------------------------------
+
+async fn run_po_persona_interview(
+    db_path: String,
+    session_id: i64,
+    project_id: i64,
+    chat_notify: Arc<Mutex<HashMap<i64, Arc<Notify>>>>,
+) {
+    let chat_storage = match SqliteUserChatStorage::open(&db_path) {
+        Ok(s) => s,
+        Err(e) => {
+            log::warn!("user_chat: open storage (PO persona): {}", e);
+            return;
+        }
+    };
+
+    let messages = match chat_storage.get_messages(session_id).await {
+        Ok(m) => m,
+        Err(e) => {
+            log::warn!("user_chat: get messages (PO persona): {}", e);
+            return;
+        }
+    };
+
+    let raw_messages: Vec<(String, String)> = messages
+        .iter()
+        .map(|m| {
+            let role = match m.author_type.as_str() {
+                "user" => "user",
+                _ => "assistant",
+            };
+            let text = MessageContent::from_row(&m.content_type, &m.content).to_llm_text();
+            (role.to_string(), text)
+        })
+        .collect();
+    let llm_messages = merge_consecutive_roles(raw_messages);
+
+    log::info!(
+        "[PO:persona_interview:session={}] sending {} messages to LLM",
+        session_id,
+        llm_messages.len()
+    );
+
+    let config = match AgentConfig::load() {
+        Ok(c) => c,
+        Err(e) => {
+            log::warn!("user_chat: load config (PO persona): {}", e);
+            return;
+        }
+    };
+
+    let po_storage: Arc<dyn AgentStorage> = match SqliteAgentStorage::open(&db_path) {
+        Ok(s) => Arc::new(s),
+        Err(e) => {
+            log::warn!("user_chat: open agent storage (PO persona): {}", e);
+            return;
+        }
+    };
+    let po_task_storage: Arc<dyn TaskStorage> = match SqliteTaskStorage::open(&db_path) {
+        Ok(s) => Arc::new(s),
+        Err(e) => {
+            log::warn!("user_chat: open task storage (PO persona): {}", e);
+            return;
+        }
+    };
+    let po_comment_storage: Arc<dyn CommentStorage> = match SqliteCommentStorage::open(&db_path) {
+        Ok(s) => Arc::new(s),
+        Err(e) => {
+            log::warn!("user_chat: open comment storage (PO persona): {}", e);
+            return;
+        }
+    };
+    let po_note_storage: Arc<dyn ProjectNoteStorage> =
+        match SqliteProjectNoteStorage::open(&db_path) {
+            Ok(s) => Arc::new(s),
+            Err(e) => {
+                log::warn!("user_chat: open project note storage (PO persona): {}", e);
+                return;
+            }
+        };
+    let po = match ProductOwnerAgent::new(
+        po_storage,
+        po_task_storage,
+        po_comment_storage,
+        po_note_storage,
+        config,
+        project_id,
+    ) {
+        Ok(a) => a,
+        Err(e) => {
+            log::warn!("user_chat: build PO (persona): {}", e);
+            return;
+        }
+    };
+
+    log::info!(
+        "[PO:persona_interview:session={}] calling respond_in_session",
+        session_id
+    );
+    let result = po
+        .respond_in_session(session_id, llm_messages.clone(), PoMode::PersonaInterview)
+        .await;
+    log::info!(
+        "[PO:persona_interview:session={}] respond_in_session returned: {:?}",
+        session_id,
+        result
+            .as_ref()
+            .map(|r| format!("{:?}", r))
+            .unwrap_or_else(|e| format!("Err({:?})", e))
+    );
+
+    match result {
+        Ok(PoSessionResult::PersonaInterviewComplete { closing_message }) => {
+            // Show the closing message to the user.
+            if let Err(e) = chat_storage
+                .append_message(
+                    session_id,
+                    "agent",
+                    None,
+                    Some(AgentType::ProductOwner),
+                    None,
+                    MessageContent::Text(closing_message),
+                )
+                .await
+            {
+                log::warn!("user_chat: store PO persona closing message: {}", e);
+                return;
+            }
+            notify_session(&chat_notify, session_id).await;
+
+            // Transition to planning session.
+            let session = match chat_storage.get_session(session_id).await {
+                Ok(Some(s)) => s,
+                _ => {
+                    log::warn!("user_chat: persona session not found for completion");
+                    return;
+                }
+            };
+            handle_persona_complete(
+                &db_path,
+                session_id,
+                session.project_id,
+                session.created_by_user_id,
+                &chat_storage,
+                &chat_notify,
+            )
+            .await;
+        }
+        Ok(PoSessionResult::Questions { message, questions }) => {
+            if !message.trim().is_empty() {
+                if let Err(e) = chat_storage
+                    .append_message(
+                        session_id,
+                        "agent",
+                        None,
+                        Some(AgentType::ProductOwner),
+                        None,
+                        MessageContent::Text(message),
+                    )
+                    .await
+                {
+                    log::warn!("user_chat: store PO persona message: {}", e);
+                }
+            }
+            for q in questions {
+                if let Err(e) = chat_storage
+                    .append_message(
+                        session_id,
+                        "agent",
+                        None,
+                        Some(AgentType::ProductOwner),
+                        None,
+                        MessageContent::StructuredQuestion(q),
+                    )
+                    .await
+                {
+                    log::warn!("user_chat: store PO persona question: {}", e);
+                }
+            }
+            notify_session(&chat_notify, session_id).await;
+        }
+        Ok(PoSessionResult::Text(t)) if !t.trim().is_empty() => {
+            if let Err(e) = chat_storage
+                .append_message(
+                    session_id,
+                    "agent",
+                    None,
+                    Some(AgentType::ProductOwner),
+                    None,
+                    MessageContent::Text(t),
+                )
+                .await
+            {
+                log::warn!("user_chat: store PO persona text: {}", e);
+            }
+            notify_session(&chat_notify, session_id).await;
+        }
+        Ok(_) | Err(_) => {
+            // Silent, unexpected, or error — log but don't break.
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Background task: PO handles gap clarification session
+// ---------------------------------------------------------------------------
+
+async fn run_po_gap_clarification(
+    db_path: String,
+    session_id: i64,
+    project_id: i64,
+    chat_notify: Arc<Mutex<HashMap<i64, Arc<Notify>>>>,
+) {
+    let chat_storage = match SqliteUserChatStorage::open(&db_path) {
+        Ok(s) => s,
+        Err(e) => {
+            log::warn!("user_chat: open storage (PO gap clarification): {}", e);
+            return;
+        }
+    };
+
+    let messages = match chat_storage.get_messages(session_id).await {
+        Ok(m) => m,
+        Err(e) => {
+            log::warn!("user_chat: get messages (PO gap clarification): {}", e);
+            return;
+        }
+    };
+
+    let raw_messages: Vec<(String, String)> = messages
+        .iter()
+        .map(|m| {
+            let role = match m.author_type.as_str() {
+                "user" => "user",
+                _ => "assistant",
+            };
+            let text = MessageContent::from_row(&m.content_type, &m.content).to_llm_text();
+            (role.to_string(), text)
+        })
+        .collect();
+    let llm_messages = merge_consecutive_roles(raw_messages);
+
+    log::info!(
+        "[PO:gap_clarification:session={}] sending {} messages to LLM",
+        session_id,
+        llm_messages.len()
+    );
+
+    let config = match AgentConfig::load() {
+        Ok(c) => c,
+        Err(e) => {
+            log::warn!("user_chat: load config (PO gap clarification): {}", e);
+            return;
+        }
+    };
+
+    let po_storage: Arc<dyn AgentStorage> = match SqliteAgentStorage::open(&db_path) {
+        Ok(s) => Arc::new(s),
+        Err(e) => {
+            log::warn!(
+                "user_chat: open agent storage (PO gap clarification): {}",
+                e
+            );
+            return;
+        }
+    };
+    let task_storage: Arc<dyn TaskStorage> = match SqliteTaskStorage::open(&db_path) {
+        Ok(s) => Arc::new(s),
+        Err(e) => {
+            log::warn!("user_chat: open task storage (PO gap clarification): {}", e);
+            return;
+        }
+    };
+    let comment_storage: Arc<dyn CommentStorage> = match SqliteCommentStorage::open(&db_path) {
+        Ok(s) => Arc::new(s),
+        Err(e) => {
+            log::warn!(
+                "user_chat: open comment storage (PO gap clarification): {}",
+                e
+            );
+            return;
+        }
+    };
+    let note_storage: Arc<dyn ProjectNoteStorage> = match SqliteProjectNoteStorage::open(&db_path) {
+        Ok(s) => Arc::new(s),
+        Err(e) => {
+            log::warn!("user_chat: open note storage (PO gap clarification): {}", e);
+            return;
+        }
+    };
+
+    let po = match ProductOwnerAgent::new(
+        po_storage,
+        task_storage,
+        comment_storage,
+        note_storage,
+        config,
+        project_id,
+    ) {
+        Ok(p) => p,
+        Err(e) => {
+            log::warn!("user_chat: create PO agent (gap clarification): {}", e);
+            return;
+        }
+    };
+
+    log::info!(
+        "[PO:gap_clarification:session={}] calling respond_in_session",
+        session_id
+    );
+    let result = po
+        .respond_in_session(session_id, llm_messages.clone(), PoMode::GapClarification)
+        .await;
+    log::info!(
+        "[PO:gap_clarification:session={}] respond_in_session returned: {:?}",
+        session_id,
+        result
+            .as_ref()
+            .map(|r| format!("{:?}", r))
+            .unwrap_or_else(|e| format!("Err({:?})", e))
+    );
+
+    match result {
+        Ok(PoSessionResult::GapClarificationComplete { closing_message }) => {
+            // Show the closing message to the user.
+            if let Err(e) = chat_storage
+                .append_message(
+                    session_id,
+                    "agent",
+                    None,
+                    Some(AgentType::ProductOwner),
+                    None,
+                    MessageContent::Text(closing_message),
+                )
+                .await
+            {
+                log::warn!("user_chat: store PO gap closing message: {}", e);
+                return;
+            }
+            notify_session(&chat_notify, session_id).await;
+
+            // Complete the gap clarification session and re-run Praxis Writer.
+            let session = match chat_storage.get_session(session_id).await {
+                Ok(Some(s)) => s,
+                _ => {
+                    log::warn!("user_chat: gap session not found for completion");
+                    return;
+                }
+            };
+            if let Err(e) = chat_storage.complete_session(session_id).await {
+                log::warn!("user_chat: complete gap session: {}", e);
+            }
+            handle_gap_clarification_complete(&db_path, session_id, session.project_id).await;
+        }
+        Ok(PoSessionResult::Questions { message, questions }) => {
+            if !message.trim().is_empty() {
+                if let Err(e) = chat_storage
+                    .append_message(
+                        session_id,
+                        "agent",
+                        None,
+                        Some(AgentType::ProductOwner),
+                        None,
+                        MessageContent::Text(message),
+                    )
+                    .await
+                {
+                    log::warn!("user_chat: store PO gap message: {}", e);
+                }
+            }
+            for q in questions {
+                if let Err(e) = chat_storage
+                    .append_message(
+                        session_id,
+                        "agent",
+                        None,
+                        Some(AgentType::ProductOwner),
+                        None,
+                        MessageContent::StructuredQuestion(q),
+                    )
+                    .await
+                {
+                    log::warn!("user_chat: store PO gap question: {}", e);
+                }
+            }
+            notify_session(&chat_notify, session_id).await;
+        }
+        Ok(PoSessionResult::Text(t)) if !t.trim().is_empty() => {
+            if let Err(e) = chat_storage
+                .append_message(
+                    session_id,
+                    "agent",
+                    None,
+                    Some(AgentType::ProductOwner),
+                    None,
+                    MessageContent::Text(t),
+                )
+                .await
+            {
+                log::warn!("user_chat: store PO gap text: {}", e);
+            }
+            notify_session(&chat_notify, session_id).await;
+        }
+        Ok(_) | Err(_) => {
+            // Silent, unexpected, or error — log but don't break.
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Gap clarification complete → re-run Praxis Writer
+// ---------------------------------------------------------------------------
+
+async fn handle_gap_clarification_complete(db_path: &str, gap_session_id: i64, project_id: i64) {
+    // Re-read updated persona notes and re-run Praxis Writer.
+    let conn = match rusqlite::Connection::open(db_path) {
+        Ok(c) => c,
+        Err(e) => {
+            log::warn!("[gap_complete] open db: {}", e);
+            return;
+        }
+    };
+
+    // Load current persona notes.
+    let persona_notes: Vec<PersonaNote> = {
+        let mut stmt = match conn.prepare(
+            "SELECT pn.note
+             FROM project_note pn
+             LEFT JOIN project_note newer ON newer.replaces_id = pn.id
+             WHERE pn.project_id = ?1 AND newer.id IS NULL
+             ORDER BY pn.id ASC",
+        ) {
+            Ok(s) => s,
+            Err(e) => {
+                log::warn!("[gap_complete] prepare note query: {}", e);
+                return;
+            }
+        };
+
+        let raw: Vec<String> =
+            match stmt.query_map(rusqlite::params![project_id], |row| row.get::<_, String>(0)) {
+                Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+                Err(e) => {
+                    log::warn!("[gap_complete] query notes: {}", e);
+                    return;
+                }
+            };
+
+        raw.into_iter()
+            .filter_map(|note_text| {
+                let content: SpecNoteContent = serde_json::from_str(&note_text).ok()?;
+                match content {
+                    SpecNoteContent::Persona(p) => Some(p),
+                }
+            })
+            .collect()
+    };
+
+    if persona_notes.is_empty() {
+        log::warn!("[gap_complete] no persona notes found, skipping re-run");
+        return;
+    }
+
+    // Check if there are still gaps — if so, don't re-run (would loop forever).
+    let remaining_gaps = find_gaps_from_persona_notes(&persona_notes);
+    if !remaining_gaps.is_empty() {
+        log::info!(
+            "[gap_complete] {} gaps remain after clarification (user may have declined some)",
+            remaining_gaps.len()
+        );
+        // Still re-run — the Praxis Writer will emit code with empty arrays for
+        // declined fields, which is acceptable.
+    }
+
+    // Find the project path.
+    let project_path: String = match conn.query_row(
+        "SELECT path FROM project WHERE id = ?1",
+        rusqlite::params![project_id],
+        |row| row.get(0),
+    ) {
+        Ok(p) => p,
+        Err(e) => {
+            log::warn!("[gap_complete] get project path: {}", e);
+            return;
+        }
+    };
+
+    // Re-run Praxis Writer.
+    let agent =
+        match crate::agents_api::rust_engineer::handlers::build_rust_engineer_at(&project_path) {
+            Ok(a) => a,
+            Err(e) => {
+                log::warn!("[gap_complete] build rust engineer: {}", e);
+                return;
+            }
+        };
+
+    log::info!(
+        "[gap_complete] re-running praxis_auth with {} personas",
+        persona_notes.len()
+    );
+
+    match agent.run_praxis_auth(&persona_notes, true).await {
+        Ok(output) => {
+            log::info!(
+                "[gap_complete] praxis_auth re-run complete: gaps={}, files={:?}",
+                output.gaps.len(),
+                output.files_written
+            );
+            // Store a system message in the gap session summarizing the re-generation.
+            let summary = if output.gaps.is_empty() {
+                "Spec re-generated successfully with all persona data filled.".to_string()
+            } else {
+                format!(
+                    "Spec re-generated. {} gaps remain (user declined to answer some).",
+                    output.gaps.len()
+                )
+            };
+            let chat_storage = match SqliteUserChatStorage::open(db_path) {
+                Ok(s) => s,
+                Err(e) => {
+                    log::warn!("[gap_complete] open chat storage: {}", e);
+                    return;
+                }
+            };
+            if let Err(e) = chat_storage
+                .append_message(
+                    gap_session_id,
+                    "system",
+                    None,
+                    None,
+                    None,
+                    MessageContent::Text(summary),
+                )
+                .await
+            {
+                log::warn!("[gap_complete] store summary: {}", e);
+            }
+        }
+        Err(e) => {
+            log::warn!("[gap_complete] praxis_auth re-run error: {}", e);
+        }
+    }
+}
+
+/// Create a gap_clarification session for a project.
+///
+/// Seeds the session with a gap-context message that tells PO which persona
+/// fields need filling. Returns the session ID.
+pub async fn create_gap_clarification_session(
+    db_path: &str,
+    project_id: i64,
+    user_id: i64,
+    gaps: &[SpecGap],
+    chat_storage: &SqliteUserChatStorage,
+    chat_notify: &Arc<Mutex<HashMap<i64, Arc<Notify>>>>,
+) -> Result<i64, String> {
+    let session_id = chat_storage
+        .create_session(project_id, user_id, "gap_clarification")
+        .await
+        .map_err(|e| format!("create session: {}", e))?;
+
+    // Build gap context seed message with stable project_note ids so PO can
+    // supersede the incomplete persona notes without exact-text matching.
+    let gap_questions = gaps_to_questions(gaps);
+    let persona_note_refs = load_current_persona_note_refs(db_path, project_id);
+    let seed = build_gap_seed(&gap_questions, &persona_note_refs);
+
+    chat_storage
+        .append_message(
+            session_id,
+            "system",
+            None,
+            None,
+            None,
+            MessageContent::Text(seed),
+        )
+        .await
+        .map_err(|e| format!("store seed: {}", e))?;
+
+    notify_session(chat_notify, session_id).await;
+
+    // Fire PO in the background.
+    let db_path = db_path.to_string();
+    let chat_notify = chat_notify.clone();
+    actix_web::rt::spawn(async move {
+        run_po_gap_clarification(db_path, session_id, project_id, chat_notify).await;
+    });
+
+    Ok(session_id)
+}
+
+fn load_current_persona_note_refs(
+    db_path: &str,
+    project_id: i64,
+) -> HashMap<String, (i64, String)> {
+    let conn = match rusqlite::Connection::open(db_path) {
+        Ok(c) => c,
+        Err(e) => {
+            log::warn!("[gap_seed] open db: {}", e);
+            return HashMap::new();
+        }
+    };
+
+    let mut stmt = match conn.prepare(
+        "SELECT pn.id, pn.note
+         FROM project_note pn
+         LEFT JOIN project_note newer ON newer.replaces_id = pn.id
+         WHERE pn.project_id = ?1 AND newer.id IS NULL
+         ORDER BY pn.id ASC",
+    ) {
+        Ok(s) => s,
+        Err(e) => {
+            log::warn!("[gap_seed] prepare note query: {}", e);
+            return HashMap::new();
+        }
+    };
+
+    let rows = match stmt.query_map(rusqlite::params![project_id], |row| {
+        Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+    }) {
+        Ok(rows) => rows,
+        Err(e) => {
+            log::warn!("[gap_seed] query notes: {}", e);
+            return HashMap::new();
+        }
+    };
+
+    rows.filter_map(|row| {
+        let (id, note_text) = row.ok()?;
+        let content: SpecNoteContent = serde_json::from_str(&note_text).ok()?;
+        match content {
+            SpecNoteContent::Persona(persona) => {
+                let persona_json = serde_json::to_string(&persona).ok()?;
+                Some((persona.id, (id, persona_json)))
+            }
+        }
+    })
+    .collect()
+}
+
+/// Build a seed message for the gap_clarification session.
+fn build_gap_seed(
+    gaps: &[GapQuestion],
+    persona_note_refs: &HashMap<String, (i64, String)>,
+) -> String {
+    let mut out = String::from(
+        "## Spec Gaps — Clarification Needed\n\n\
+         The spec writer found gaps in the persona data. Please fill in the \
+         missing information for each persona listed below. When recording an \
+         updated persona note, use the listed project_note_id as \
+         replaces_note_id.\n\n",
+    );
+
+    for gap in gaps {
+        let note_context = persona_note_refs
+            .get(&gap.artifact_id)
+            .map(|(id, note)| {
+                format!(
+                    "Current project_note_id: {}\nCurrent note JSON: {}\n",
+                    id, note
+                )
+            })
+            .unwrap_or_else(|| "Current project_note_id: unknown\n".to_string());
+        out.push_str(&format!(
+            "### Persona: {}\n\
+             {}\
+             Missing fields: {}\n\
+             Reason: {}\n\n",
+            gap.artifact_id,
+            note_context,
+            gap.missing_fields.join(", "),
+            gap.reason,
+        ));
+    }
+
+    out
 }
 
 // ---------------------------------------------------------------------------
@@ -1291,7 +2121,115 @@ async fn handle_pm_finalized(
         }
     };
 
+    hydrate_praxis_tasks(db_path, project_id, &task_ids);
+
     if let Err(e) = val_po.validate_tasks(task_ids).await {
         log::warn!("user_chat: PO validate tasks: {}", e);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Hydrate praxis_engineer tasks with structured PraxisWriterTaskSpec
+// ---------------------------------------------------------------------------
+//
+// After PM finalises, any task with assigned_to_agent = "praxis_engineer" needs
+// its description replaced with a serialised PraxisWriterTaskSpec. PM writes
+// plain-text instructions; this function reads the project's current persona
+// notes from the DB, assembles the spec, and updates the task row.
+// The actual dispatch to RustEngineer praxis_auth mode is wired in Phase 4e.
+
+fn hydrate_praxis_tasks(db_path: &str, project_id: i64, task_ids: &[i64]) {
+    let conn = match rusqlite::Connection::open(db_path) {
+        Ok(c) => c,
+        Err(e) => {
+            log::warn!("[praxis] open db: {}", e);
+            return;
+        }
+    };
+
+    // Load current persona notes for this project.
+    let persona_rows: Vec<(i64, PersonaNote)> = {
+        let mut stmt = match conn.prepare(
+            "SELECT pn.id, pn.note
+             FROM project_note pn
+             LEFT JOIN project_note newer ON newer.replaces_id = pn.id
+             WHERE pn.project_id = ?1 AND newer.id IS NULL
+             ORDER BY pn.id ASC",
+        ) {
+            Ok(s) => s,
+            Err(e) => {
+                log::warn!("[praxis] prepare note query: {}", e);
+                return;
+            }
+        };
+
+        let raw: Vec<(i64, String)> = match stmt.query_map(rusqlite::params![project_id], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+        }) {
+            Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+            Err(e) => {
+                log::warn!("[praxis] query persona notes: {}", e);
+                return;
+            }
+        };
+        // stmt borrow released after raw is collected; parse outside the borrow.
+        raw.into_iter()
+            .filter_map(|(id, note_text)| {
+                let content: SpecNoteContent = serde_json::from_str(&note_text).ok()?;
+                match content {
+                    SpecNoteContent::Persona(p) => Some((id, p)),
+                }
+            })
+            .collect()
+    };
+
+    for &task_id in task_ids {
+        // Read assigned_to_agent and description for this task.
+        use rusqlite::OptionalExtension;
+        let row: Option<(String, String)> = conn
+            .query_row(
+                "SELECT assigned_to_agent, description FROM task WHERE id = ?1",
+                rusqlite::params![task_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .ok()
+            .flatten();
+
+        let Some((assigned, instructions)) = row else {
+            continue;
+        };
+        if assigned != "praxis_engineer" {
+            continue;
+        }
+
+        let spec = PraxisWriterTaskSpec {
+            mode: "praxis_auth".to_string(),
+            personas: persona_rows.iter().map(|(_, p)| p.clone()).collect(),
+            instructions,
+            source_note_ids: persona_rows.iter().map(|(id, _)| *id).collect(),
+        };
+
+        let spec_json = match serde_json::to_string(&spec) {
+            Ok(j) => j,
+            Err(e) => {
+                log::warn!("[praxis] serialize spec for task={}: {}", task_id, e);
+                continue;
+            }
+        };
+
+        if let Err(e) = conn.execute(
+            "UPDATE task SET description = ?1 WHERE id = ?2",
+            rusqlite::params![spec_json, task_id],
+        ) {
+            log::warn!("[praxis] update task={} description: {}", task_id, e);
+            continue;
+        }
+
+        log::info!(
+            "[praxis] task={} hydrated with {} personas (mode=praxis_auth)",
+            task_id,
+            spec.personas.len()
+        );
     }
 }

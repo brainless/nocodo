@@ -21,6 +21,10 @@ Repository scope reviewed for this design:
 - `shared-types/`
 - `DEVELOP.md`
 
+**Related documents:**
+- `agents/RUNTIME.md` — design for `nocodo_praxis`, the provenance-aware vocabulary crate that makes the gap between requirements and generated code explicit, typed, and verifiable. The spec crate *is* the runtime (Path C).
+- `agents/MILESTONE_PRAXIS.md` — phased implementation plan for the praxis pipeline: structured spec schemas, PO persona interview, PM rework for agent-facing tasks, Praxis Writer mode, and the clarification loop.
+
 
 ## Current State (As-Is)
 
@@ -58,6 +62,7 @@ Repository scope reviewed for this design:
 | `engineering_manager` (EM) | Technical shaping. Gates `needs_technical_shaping → ready` for tasks that need it. May read codebase. | No initially; will join user chat later. | Cloud (Anthropic/Groq/OpenAI) |
 | `db_engineer`, `backend_engineer`, `frontend_engineer`, `ui_designer` | Execute `ready` tasks assigned to them. | No — interaction via task comments only. | Small (≤ 20B) |
 | `rust_engineer` | Generates Rust/Diesel ORM impl functions by example. Single-shot prompt → code. Uses tree-sitter extraction for struct definitions, existing impl functions, and dependent types. | No — admin UI tool for code generation | Tiny (≤ 1B, llama.cpp local) |
+| `praxis_engineer` | Praxis Writer — a RustEngineer mode that generates `nocodo_praxis` spec code (personas, permissions, roles, states) from PM's structured task specs. Consumes `PraxisWriterTaskSpec` JSON from task descriptions. | No — admin-triggered via RustEngineer API | Tiny (≤ 1B, llama.cpp local) |
 
 ### 1a) Small-Model Code Agents
 
@@ -72,6 +77,8 @@ Code writer agents (`db_engineer`, `backend_engineer`, `frontend_engineer`, `ui_
 - **Transparent output** — return prompt + raw response + extracted code for debugging
 
 **`rust_engineer`** is the most constrained: runs on `Qwen3.5-0.8B` via llama.cpp at `localhost:8080`, single-shot, no tools, max 512 tokens. Override with `RUST_ENGINEER_MODEL` / `LLAMA_CPP_BASE_URL`.
+
+**`praxis_engineer` (Praxis Writer)** is a RustEngineer mode (`praxis_auth`) that generates `nocodo_praxis` spec code into the managed project at `backend/src/praxis/specs/`. It receives `PraxisWriterTaskSpec` JSON (personas, permissions, instructions) from PM's structured task descriptions, builds a prompt seeded with `nocodo_praxis` type documentation (extracted via `praxis_doc.rs`), and produces `{personas,permissions,roles}.rs`. Post-processing detects `Unresolved::Pending` gaps and triggers the clarification loop (Phase 4f) — gaps flow back to PO for re-interviewing, then Praxis Writer re-runs. Designed for local single-shot inference following the same pattern as `diesel_model`.
 
 ### 2) Two-Phase User Chat Surface
 
@@ -283,6 +290,8 @@ The backend implementation executes one SQLite transaction:
 4. Set `user_chat_session.completed_at`.
 
 Atomicity is structural — one tool call, one transaction. PM must formulate the complete set of artifacts in a single response.
+
+**Structured task descriptions for code agents:** When PM creates tasks for code-generating agents (e.g. `praxis_engineer`), the task `description` field carries serialized JSON rather than free-form prose. The `PraxisWriterTaskSpec` schema (defined in `agents/src/storage/spec_schemas.rs`) bundles persona data, permission data, and instructions, all deserialized from PO's structured project notes. The backend `hydrate_praxis_tasks` handler assembles this JSON from DB persona notes and writes it into `task.description` before PM's transaction commits. Downstream agents read the JSON deterministically — no LLM parsing of prose required.
 
 **Post-finalization:** After PM commits, the backend immediately fires PO's `validate_tasks` on all newly created task IDs. PO transitions each task out of `draft` using `initial_state_for(agent_type)`.
 
@@ -538,6 +547,35 @@ for the same agent:
 (informal). The same physical agent (same code, same struct) runs in different modes
 depending on how and when it is invoked.
 
+### Mode Selection: Deterministic, Not LLM-Decided
+
+The backend selects which mode an agent should run in — the LLM **never** chooses its own
+mode via tool call. Mode selection is a data-dependent routing decision:
+
+- Session type (`user_chat_session.session_type`) determines whether the session is intake,
+  persona interview, or planning; the backend routes to the correct agent + mode.
+- After PM creates tasks, the dispatcher routes them to specialists based on
+  `task.assigned_to_agent` and `task.status`.
+- RustEngineer mode is selected by the user in the admin UI, not by the LLM.
+
+This avoids unreliable LLM tool calls for mode transitions and keeps routing logic in
+Rust where it is grep-able, testable, and auditable.
+
+### Provenance: Foreign Keys over Opaque Strings
+
+Wherever structured data references its source, use a **foreign key** to a concrete
+database record rather than an opaque string tag:
+
+- `PersonaNote.provenance_message_id: Option<i64>` — FK to `user_chat_message.id`
+  where the user described this persona. `None` means LLM-inferred.
+- `project_note.source_session_id: Option<i64>` — FK to `user_chat_session.id` where
+  the note was recorded.
+- `task.source_session_id: Option<i64>` — FK to the planning session where PM created
+  the task.
+
+Favour integer FKs over `"inferred"` magic strings. An FK gives exact traceability — a
+generated persona can point back to the exact conversation message that produced it.
+
 ### Module Structure
 
 Each agent that has more than one mode uses a `modes/` sub-directory:
@@ -584,10 +622,12 @@ pub fn system_prompt() -> String {
 |------|------|-----------|-----------------|
 | `requirements_gathering` | `modes/requirements_gathering.rs` | Every user turn during intake | `request_user_input`, `record_project_note`, `complete_requirements` |
 | `project_naming` | `modes/project_naming.rs` | Single call by backend after `RequirementsComplete` | `set_project_name` |
+| `persona_interview` | `modes/persona_interview.rs` | Deterministically after intake; backend creates a persona interview session | `request_user_input`, `record_project_note` (content_type="persona"), `complete_persona_interview` |
 
-The two modes are separate LLM calls. `requirements_gathering` mode drives the full intake
-conversation; `project_naming` mode fires once at the end to name the project from the
-conversation history. PO has no knowledge of PM — the backend handles the transition.
+The three modes are separate LLM calls. `requirements_gathering` drives the full intake
+conversation; `project_naming` fires once at the end to name the project from the
+conversation history; `persona_interview` drills deep into each user persona identified
+during intake. PO has no knowledge of PM — the backend handles the transition.
 
 ### PM Modes (Current)
 
@@ -646,7 +686,8 @@ agents/src/rust_engineer/
     ├── mod.rs
     ├── diesel_model.rs        ← impl function prompt builder
     ├── diesel_model_struct.rs ← compact struct system prompt
-    └── diesel_schema.rs       ← compact table schema system prompt
+    ├── diesel_schema.rs       ← compact table schema system prompt
+    └── praxis_auth.rs         ← nocodo_praxis spec code generator
 ```
 
 **Backend endpoint:** `POST /api/rust-engineer/run` (synchronous, runs inline).
@@ -661,6 +702,7 @@ debug panels. Wrench icon in sidebar.
 | `diesel_model` | `modes/diesel_model.rs` | `struct_name`, `fn_name` | Diesel impl function body for SQLite |
 | `diesel_model_struct` | `modes/diesel_model_struct.rs` | user prompt containing schema/request and, for updates, current struct | One Diesel model struct |
 | `diesel_schema` | `modes/diesel_schema.rs` | user prompt containing schema/request and, for updates, current `diesel::table!` block | One Diesel `table!` definition |
+| `praxis_auth` | `modes/praxis_auth.rs` | `PersonaNote` data from PM's `PraxisWriterTaskSpec` | `personas.rs`, `permissions.rs`, `roles.rs` in `backend/src/praxis/specs/` |
 
 **`diesel_model` mode flow:**
 1. `find_struct_file()` → locate the `.rs` file containing the struct
@@ -754,10 +796,11 @@ Extend `agents/src/storage/mod.rs:11-17`:
 
 ### Per-Agent Tools
 
-- **PO**: `request_user_input(question, input_type, options)` — poses structured choice questions during intake. `record_project_note(topic, title, note, replaces_note?)` — records requirements facts as project notes. `complete_requirements(closing_message)` — signals end of requirements gathering; backend calls PO in project naming mode next. `set_project_name(name)` — names the project (project naming mode only); backend then creates the planning session and fires PM. `validate_tasks(task_ids)` — transitions all PM-created tasks out of `draft` using `initial_state_for`.
-- **PM**: `finalize_session(final_message, epic_title, epic_description, tasks)` — atomically commits artifacts + completes the planning session in one transaction. `request_user_input(question, input_type, options)` — poses structured choice questions during planning.
+- **PO**: `request_user_input(question, input_type, options)` — poses structured choice questions during intake. `record_project_note(topic, note, replaces_note?, content_type?)` — records requirements facts as project notes; `content_type="persona"` wraps the note as structured `PersonaNote` JSON. `complete_requirements(closing_message)` — signals end of requirements gathering; backend calls PO in project naming mode next. `set_project_name(name)` — names the project (project naming mode only). `complete_persona_interview(closing_message)` — signals all personas documented (persona interview mode only); backend creates planning session and fires PM. `validate_tasks(task_ids)` — transitions all PM-created tasks out of `draft` using `initial_state_for`.
+- **PM**: `finalize_session(final_message, epic_title, epic_description, tasks)` — atomically commits artifacts + completes the planning session in one transaction. Tasks for code agents carry structured JSON (e.g. `PraxisWriterTaskSpec`) in `description`. `request_user_input(question, input_type, options)` — poses structured choice questions during planning.
 - **EM**: `mark_task_ready`, `comment_on_task`.
 - **Specialist**: `complete_task`, `comment_on_assigned_task`.
+- **Praxis Engineer**: Not an independent agent — runs as a RustEngineer mode (`praxis_auth`). Consumes `PraxisWriterTaskSpec` JSON from task descriptions, generates `nocodo_praxis` spec code into the managed project. Admin-triggered via `POST /api/rust-engineer/praxis-auth`; explicitly excluded from auto-dispatch.
 
 The `request_user_input` tool is defined in `agents/src/user_input_tool.rs` and shared. It is not agent-specific.
 
@@ -765,10 +808,11 @@ The `request_user_input` tool is defined in `agents/src/user_input_tool.rs` and 
 
 Prompts are organised using the Agent Mode Architecture described above.
 
-- **PO**: organised under `agents/src/product_owner/modes/`. `core.rs` holds the invariant PO identity (warm, empathetic, non-technical, MVP-first). `requirements_gathering.rs` drives intake — gather business context, users, data, features, constraints; use `request_user_input` for structured choices; record facts immediately with `record_project_note`; call `complete_requirements` when done. `project_naming.rs` is a focused, single-call mode: derive a project name from the conversation history and call `set_project_name`. Never refer to internal roles or PM to the user.
-- **PM**: organised under `agents/src/project_manager/modes/`. `core.rs` holds the invariant PM identity; each mode file adds its activation-context-specific instructions. See the Agent Mode Architecture section for the full mode table.
+- **PO**: organised under `agents/src/product_owner/modes/`. `core.rs` holds the invariant PO identity (warm, empathetic, non-technical, MVP-first). `requirements_gathering.rs` drives intake — gather business context, users, data, features, constraints; use `request_user_input` for structured choices; record facts immediately with `record_project_note`; call `complete_requirements` when done. `project_naming.rs` is a focused, single-call mode: derive a project name from the conversation history and call `set_project_name`. `persona_interview.rs` drills into user personas, producing `PersonaNote` structured notes via `record_project_note(content_type="persona")`. Never refer to internal roles or PM to the user.
+- **PM**: organised under `agents/src/project_manager/modes/`. `core.rs` holds the invariant PM identity; each mode file adds its activation-context-specific instructions. `po_handoff.rs` now reads PO's structured project notes (`PersonaNote`, etc.) and produces agent-facing `PraxisWriterTaskSpec` JSON in task descriptions. See the Agent Mode Architecture section for the full mode table.
 - **EM**: technical shaping (TBD content); read codebase as needed; transition `needs_technical_shaping → ready`.
 - **RustEngineer**: organised under `agents/src/rust_engineer/modes/`. No `core.rs` — modes are self-contained prompt builders. Each mode extracts code context via tree-sitter, builds an example-rich single-shot prompt, and returns `(prompt, metadata)`. The agent fires the LLM and post-processes deterministically. See the RustEngineer section above for mode details.
+- **Praxis Writer** (`praxis_engineer`): implemented as RustEngineer mode `praxis_auth` in `agents/src/rust_engineer/modes/praxis_auth.rs`. Prompt includes `nocodo_praxis` type documentation extracted by `agents/src/praxis_doc.rs`, construction examples from the todo_app sample spec, and the persona data from PM's `PraxisWriterTaskSpec`. Output is validated via `find_pending_gaps()` in `agents/src/spec_gap.rs` — detected `Unresolved::Pending` nodes trigger the clarification loop back to PO. Structured note schemas (`SpecNoteContent`, `PraxisWriterTaskSpec`, `PersonaNote`) live in `agents/src/storage/spec_schemas.rs`.
 
 ### Initial State Policy
 
@@ -902,6 +946,8 @@ Additive, backward-compatible phases.
 - **EM blocking** — if EM refuses to mark `ready`, what state? Back to `draft` with a comment, or a new `blocked` state?
 - **Display-name collisions** — two guests pick the same name. Allow? Disambiguate in UI by `user.id`?
 - **PM follow-up burden** — should PM be able to ask PO clarifying questions before finalizing, or work solely from the handoff summary?
+- **Praxis gap clarification UX** — when the clarification loop sends Unresolved gaps back to PO, should the user see these as a new intake session, an inline thread, or something else?
+- **Praxis Writer reliability** — can a ≤ 1B model generate valid `nocodo_praxis` spec code reliably enough for production use, or does this require a cloud model fallback?
 
 
 ## Code Extractor
@@ -925,7 +971,7 @@ Tree-sitter-based code extraction for coding agents (small models, precise conte
 
 ## Proposed Next Steps
 
-Phases 1–6 are complete. Remaining work:
+Phases 1–6 are complete. The Praxis pipeline (RUNTIME.md, MILESTONE_PRAXIS.md) is implemented through Phase 4f (clarification loop). Remaining work:
 
 1. **EM implementation** — prompt, `mark_task_ready` tool, technical shaping workflow.
 2. **PM edits existing epics/tasks** — follow-up sessions that modify rather than create artifacts.
@@ -934,3 +980,7 @@ Phases 1–6 are complete. Remaining work:
 5. **Multi-PM / diverse thinking** — voting models for artifact quality.
 6. **RustEngineer mode expansion** — add `actix_controller`, `actix_router`, `shared_type`, `solid_component` modes if `diesel_model` proves reliable with tiny models (≤ 1B).
 7. **Small-model specialist agents** — extend tiny-model pattern to `db_engineer`, `backend_engineer`, `frontend_engineer` task execution (≤ 20B).
+8. **Praxis Writer — permissions and roles generation** — add `praxis_auth_permissions`, `praxis_auth_roles` modes after `praxis_auth` persona mode proves reliable.
+9. **Praxis state machine writer** (Phase 4h) — generate `states.rs` from structured entity/state data.
+10. **Full validation agent** (Phase 4i) — tree-sitter queries (RUNTIME.md §5.1), `rustc` compilation check, generated behavioral tests; replace basic `find_pending_gaps` scanning.
+11. **Clarification loop iteration tracking** — surface to admin if gaps don't shrink after 3 iterations.

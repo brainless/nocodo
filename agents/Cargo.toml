@@ -7,6 +7,7 @@ edition = "2021"
 llm-sdk       = { git = "https://github.com/brainless/llm-sdk.git" }
 shared-types  = { path = "../shared-types" }
 schema-codegen = { path = "../schema-codegen" }
+nocodo_praxis = { path = "../nocodo_praxis" }
 serde        = { version = "1.0", features = ["derive"] }
 serde_json   = "1.0"
 schemars     = { version = "0.8", features = ["preserve_order"] }

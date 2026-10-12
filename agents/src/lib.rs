@@ -7,9 +7,11 @@ pub mod db_engineer;
 pub mod error;
 pub mod frontend_engineer;
 pub mod nocodo_description;
+pub mod praxis_doc;
 pub mod product_owner;
 pub mod project_manager;
 pub mod rust_engineer;
+pub mod spec_gap;
 pub mod stack_reviewer;
 pub mod storage;
 pub mod task_policy;
@@ -25,17 +27,22 @@ pub use db_engineer::{AgentResponse, DbEngineerAgent, StopAgentParams};
 pub use error::AgentError;
 pub use frontend_engineer::{FrontendEngineerAgent, FrontendEngineerResponse};
 pub use product_owner::{
-    CompleteRequirementsParams, PoSessionResult, ProductOwnerAgent, RecordProjectNoteParams,
-    SetProjectNameParams,
+    CompleteGapClarificationParams, CompletePersonaInterviewParams, CompleteRequirementsParams,
+    PoMode, PoSessionResult, ProductOwnerAgent, RecordProjectNoteParams, SetProjectNameParams,
 };
 pub use project_manager::{
     FinalizeSessionParams, FinalizeTaskDef, PmResponse, PmUserSessionResult, ProjectManagerAgent,
 };
 pub use rust_engineer::{
-    DieselModelFnOutput, DieselModelStructOutput, DieselSchemaOutput, RustEngineerAgent,
-    RustEngineerResult,
+    DieselModelFnOutput, DieselModelStructOutput, DieselSchemaOutput, PraxisAuthOutput,
+    RustEngineerAgent, RustEngineerResult,
+};
+pub use spec_gap::{
+    find_gaps_from_persona_notes, find_pending_gaps_in_code, gaps_to_questions, GapQuestion,
+    SpecGap,
 };
 pub use stack_reviewer::{StackReviewResult, StackReviewerAgent};
+pub use storage::spec_schemas::{PersonaNote, PraxisWriterTaskSpec, SpecNoteContent};
 pub use storage::sqlite::{
     SqliteAgentStorage, SqliteCommentStorage, SqliteContextStorage, SqliteProjectNoteStorage,
     SqliteSchemaStorage, SqliteStackNoteStorage, SqliteTaskStorage, SqliteUiFormStorage,

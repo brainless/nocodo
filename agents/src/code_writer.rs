@@ -17,3 +17,16 @@ pub fn write_diesel_schema(project_path: &Path, code: &str) -> Result<String, Ag
     schema_codegen::append_table_to_schema(project_path, code)
         .map_err(|e| AgentError::Other(e.to_string()))
 }
+
+/// Write a praxis spec module to `backend/src/praxis/specs/{module_name}.rs`.
+///
+/// Overwrites on regeneration. Ensures `praxis/mod.rs` and `praxis/specs/mod.rs`
+/// declare the module. Returns the relative file path written.
+pub fn write_praxis_spec(
+    project_path: &Path,
+    module_name: &str,
+    code: &str,
+) -> Result<String, AgentError> {
+    schema_codegen::write_praxis_spec(project_path, module_name, code)
+        .map_err(|e| AgentError::Other(e.to_string()))
+}

@@ -1583,6 +1583,7 @@ dependencies = [
  "async-trait",
  "llm-sdk",
  "log",
+ "nocodo_praxis",
  "regex",
  "rusqlite",
  "schema-codegen",
@@ -1622,6 +1623,10 @@ dependencies = [
  "tokio",
  "toml 1.1.2+spec-1.1.0",
 ]
+
+[[package]]
+name = "nocodo_praxis"
+version = "0.1.0"
 
 [[package]]
 name = "nonzero_ext"
