@@ -126,6 +126,14 @@ impl Model {
         self.selected.is_some() && !self.is_running() && !self.sending
     }
 
+    pub fn can_apply(&self) -> bool {
+        self.can_send()
+            && self
+                .summary
+                .as_ref()
+                .is_some_and(|summary| !summary.pending.is_empty())
+    }
+
     /// Call right before a request that starts a run, so a second click cannot send it twice.
     pub fn begin_send(&mut self) {
         self.sending = true;
@@ -773,6 +781,7 @@ mod tests {
     fn summary_of(tables: &[(&str, u64)]) -> Summary {
         Summary {
             tables: tables.iter().map(|(n, c)| (n.to_string(), *c)).collect(),
+            pending: Vec::new(),
             summary: "You keep lists.".into(),
         }
     }
@@ -948,6 +957,50 @@ mod tests {
             m.next_poll(now),
             Some(Poll::Rows { offset: 0, .. })
         ));
+    }
+
+    #[test]
+    fn pending_changes_enable_apply_then_finished_run_loads_new_lists() {
+        let mut m = ready("a");
+        assert!(!m.can_apply());
+        let mut pending = summary_of(&[]);
+        pending.pending.push("0001_create_expenses".into());
+        m.handle(Msg::Summary {
+            project: "a".into(),
+            result: Ok(pending),
+        });
+        assert!(m.can_apply());
+        assert!(m.table_names().is_empty());
+
+        m.begin_send();
+        assert!(!m.can_apply());
+        m.handle(Msg::Started {
+            project: "a".into(),
+            result: Ok("r1".into()),
+        });
+        assert!(!m.can_apply());
+        m.handle(Msg::Run {
+            project: "a".into(),
+            run_id: "r1".into(),
+            result: Ok(RunStatus {
+                status: "finished".into(),
+                error: None,
+            }),
+        });
+        let mut now = Instant::now();
+        let mut summary_requested = false;
+        while let Some(poll) = m.next_poll(now) {
+            summary_requested |= matches!(poll, Poll::Summary { .. });
+            now += Duration::from_millis(1);
+        }
+        assert!(summary_requested);
+        m.handle(Msg::Summary {
+            project: "a".into(),
+            result: Ok(summary_of(&[("expenses", 0)])),
+        });
+        assert!(!m.can_apply());
+        assert_eq!(m.table_names(), ["expenses"]);
+        assert!(matches!(m.next_poll(now), Some(Poll::Rows { .. })));
     }
 
     #[test]

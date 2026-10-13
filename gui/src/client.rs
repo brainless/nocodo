@@ -49,11 +49,13 @@ pub struct RunStatus {
     pub error: Option<String>,
 }
 
-/// What `GET /summary` gives: the rows per list and the plain-language description.
+/// What `GET /summary` gives: the rows per list, pending changes and description.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct Summary {
     #[serde(default)]
     pub tables: BTreeMap<String, u64>,
+    #[serde(default)]
+    pub pending: Vec<String>,
     #[serde(default)]
     pub summary: String,
 }
@@ -429,7 +431,7 @@ mod tests {
     #[test]
     fn questions_summary_rows_and_answers_use_the_documented_routes() {
         let q = r#"{"questions":[{"id":"q1","asked_by":"schema","text":"Weekly or monthly?","choices":["Weekly","Monthly"],"default":2,"blocking":false,"why":""}]}"#;
-        let s = r#"{"tables":{"expenses":3},"applied":[],"pending":[],"backups":0,"summary":"You keep expenses."}"#;
+        let s = r#"{"tables":{"expenses":3},"applied":[],"pending":["0001_create_expenses"],"backups":0,"summary":"You keep expenses."}"#;
         let r = r#"{"table":"expenses","columns":[{"name":"id","label":"id","column_type":"integer"}],"rows":[[1],[2]],"total":2,"offset":0,"limit":50}"#;
         let a = r#"{"run_id":"r9","operation":"answer","status":"running","next":"x"}"#;
         let (base, h) = fake_server(vec![
@@ -443,6 +445,7 @@ mod tests {
         assert_eq!(qs[0].default, Some(2));
         let sum = summary(&base, "p").unwrap();
         assert_eq!(sum.tables.get("expenses"), Some(&3));
+        assert_eq!(sum.pending, ["0001_create_expenses"]);
         let page = rows(&base, "p", "expenses", 0, 50).unwrap();
         assert_eq!(page.total, 2);
         assert_eq!(
@@ -455,6 +458,14 @@ mod tests {
         assert!(seen[2].starts_with("GET /projects/p/tables/expenses/rows?offset=0&limit=50 "));
         assert!(seen[3].starts_with("POST /projects/p/answers "));
         assert!(seen[3].ends_with(r#"{"q1":2}"#));
+    }
+
+    #[test]
+    fn apply_starts_a_background_run() {
+        let accepted = r#"{"run_id":"r10","operation":"apply","status":"running","next":"x"}"#;
+        let (base, h) = fake_server(vec![("202 Accepted", accepted.into())]);
+        assert_eq!(start_run(&base, "p", "/apply", json!({})).unwrap(), "r10");
+        assert!(h.join().unwrap()[0].starts_with("POST /projects/p/apply "));
     }
 
     #[test]

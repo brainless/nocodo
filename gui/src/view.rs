@@ -1,5 +1,5 @@
-//! The single-column window: project dropdown, alert, prompt box at the bottom, status strip and
-//! the "New project" modal. All logic lives in `Model`; this file only draws and forwards clicks.
+//! The two-column window: project activity, summary and controls in the sidebar, with lists and
+//! rows in the main column. All logic lives in `Model`; this file only draws and forwards clicks.
 
 use std::path::PathBuf;
 use std::time::Instant;
@@ -38,7 +38,7 @@ const STATUS_LINES: usize = 3;
 const CHOICE_H: f32 = 26.0;
 const TAB_H: f32 = 34.0;
 const PAGER_H: f32 = 36.0;
-const SUMMARY_H: f32 = 66.0;
+const SUMMARY_MAX_H: f32 = 140.0;
 const MIN_GRID_H: f32 = 120.0;
 const SIDEBAR_MIN_W: f32 = 320.0;
 const SIDEBAR_MAX_W: f32 = 460.0;
@@ -74,6 +74,7 @@ pub struct View {
     alert: NodeId,
     prompt: NodeId,
     status: NodeId,
+    apply_bar: NodeId,
     popup_open: bool,
     popup_scroll: f32,
     prompt_text: String,
@@ -81,6 +82,7 @@ pub struct View {
     prompt_scroll: f32,
     new_project: Option<NewProjectForm>,
     q_scroll: f32,
+    summary_scroll: f32,
     grid_state: DataGridState,
     /// The list and page the grid state belongs to; the scroll resets when it changes.
     grid_key: Option<(String, u64)>,
@@ -270,6 +272,7 @@ impl View {
             ..Default::default()
         });
         layout.set_margin(status, 12.0, 0.0, 8.0, 0.0);
+        let apply_bar = leaf(&mut layout, Dimension::percent(1.0), 0.0, 0.0);
         let root = layout.new_with_children(
             Style {
                 display: Display::Flex,
@@ -280,7 +283,7 @@ impl View {
                 },
                 ..Default::default()
             },
-            &[header, alert, status, prompt_bar],
+            &[header, alert, status, apply_bar, prompt_bar],
         );
         layout.set_padding(root, 0.0, MARGIN, MARGIN, MARGIN);
 
@@ -295,6 +298,7 @@ impl View {
             alert,
             prompt,
             status,
+            apply_bar,
             popup_open: false,
             popup_scroll: 0.0,
             prompt_text: String::new(),
@@ -302,6 +306,7 @@ impl View {
             prompt_scroll: 0.0,
             new_project: None,
             q_scroll: 0.0,
+            summary_scroll: 0.0,
             grid_state: DataGridState::new(),
             grid_key: None,
             sidebar_w: SIDEBAR_MIN_W,
@@ -354,6 +359,8 @@ impl View {
         let effects = self.model.select(folder);
         self.apply_effects(effects);
         self.popup_open = false;
+        self.summary_scroll = 0.0;
+        self.q_scroll = 0.0;
     }
 
     fn submit(&mut self) {
@@ -385,6 +392,21 @@ impl View {
                 size: Size {
                     width: Dimension::percent(1.0),
                     height: length(alert_h),
+                },
+                ..Default::default()
+            },
+        );
+        let show_apply = self
+            .model
+            .summary
+            .as_ref()
+            .is_some_and(|summary| !summary.pending.is_empty());
+        self.layout.set_style(
+            self.apply_bar,
+            Style {
+                size: Size {
+                    width: Dimension::percent(1.0),
+                    height: length(if show_apply { BTN_H + 8.0 } else { 0.0 }),
                 },
                 ..Default::default()
             },
@@ -441,6 +463,7 @@ impl View {
         self.draw_alert(core);
         self.draw_prompt(core, cursor_visible);
         self.draw_lower(core);
+        self.draw_apply(core);
     }
 
     fn draw_header(&mut self, core: &mut AkarCore) {
@@ -671,7 +694,7 @@ impl View {
         }
     }
 
-    /// Everything under the prompt box: what happened, the questions, the summary and the data.
+    /// Sidebar activity, the schema summary and questions, followed by the main data view.
     fn draw_lower(&mut self, core: &mut AkarCore) {
         let area = self.layout.rect(self.status);
         let (x, w) = (area[0], area[2]);
@@ -738,10 +761,71 @@ impl View {
         if self.model.selected.is_none() {
             return;
         }
+        y = self.draw_summary(core, x, y, w, bottom);
         self.draw_questions(core, x, y, w, bottom);
         let main_x = self.sidebar_w + MARGIN;
         let main_w = (self.window[0] - main_x - MARGIN).max(0.0);
         self.draw_data(core, main_x, MARGIN, main_w, self.window[1] - MARGIN);
+    }
+
+    fn draw_summary(&mut self, core: &mut AkarCore, x: f32, y: f32, w: f32, bottom: f32) -> f32 {
+        let Some(text) = self.model.summary.as_ref().map(|s| s.summary.trim()) else {
+            return y;
+        };
+        if text.is_empty() {
+            return y;
+        }
+        let text_w = (w - 12.0).max(40.0);
+        let content_h = wrapped_h(core, BUF_SUMMARY, text, THEME.font_size_base, text_w);
+        let questions_space = if self.model.open_questions().is_empty() {
+            0.0
+        } else {
+            130.0
+        };
+        let available = (bottom - y - questions_space).max(0.0);
+        let height = content_h.min(SUMMARY_MAX_H).min(available);
+        if height < LINE_H {
+            return y;
+        }
+        let region = [x, y, w, height];
+        if core.input.is_hovering(region) {
+            self.summary_scroll -= core.input.scroll_delta.y;
+            core.input.scroll_delta.y = 0.0;
+        }
+        self.summary_scroll = self
+            .summary_scroll
+            .clamp(0.0, (content_h - height).max(0.0));
+        core.draw_list.push_scissor(region);
+        draw_text(
+            core,
+            BUF_SUMMARY,
+            text,
+            THEME.font_size_base,
+            [x, y - self.summary_scroll],
+            region,
+            THEME.base_content,
+            0.0,
+        );
+        core.draw_list.pop_scissor();
+        y + height + 14.0
+    }
+
+    fn draw_apply(&mut self, core: &mut AkarCore) {
+        let area = self.layout.rect(self.apply_bar);
+        if area[3] == 0.0 {
+            return;
+        }
+        if button(
+            core,
+            BUF_BTN + 7,
+            [area[0], area[1], area[2], BTN_H],
+            "Apply changes",
+            true,
+            self.model.can_apply(),
+            0.0,
+        ) {
+            self.start("/apply", serde_json::json!({}));
+        }
     }
 
     /// The assistant's open questions as numbered choices. Returns the y below the panel.
@@ -767,8 +851,12 @@ impl View {
             text_hs.push(h);
             content_h += h + 6.0 + q.choices.len() as f32 * CHOICE_H + 12.0;
         }
-        let max_h = ((bottom - y) * 0.55).max(180.0);
-        let region_h = content_h.min(max_h - footer_h - 2.0 * pad).max(60.0);
+        let available = bottom - y;
+        if available < footer_h + 2.0 * pad + 30.0 {
+            return y;
+        }
+        let max_h = (available * 0.55).max(130.0).min(available);
+        let region_h = content_h.min(max_h - footer_h - 2.0 * pad).max(30.0);
         let panel = [x, y, w, region_h + footer_h + 2.0 * pad];
         let region = [x + pad, y + pad, w - 2.0 * pad, region_h];
         core.draw_list
@@ -873,32 +961,22 @@ impl View {
         y + panel[3] + 10.0
     }
 
-    /// The plain-language summary, a tab per list and the rows of the chosen list.
+    /// A tab per list and the rows of the chosen list.
     fn draw_data(&mut self, core: &mut AkarCore, x: f32, y: f32, w: f32, bottom: f32) {
         let Some(summary) = self.model.summary.clone() else {
             return;
         };
-        let mut y = y;
-        if !summary.summary.trim().is_empty() {
-            draw_text(
-                core,
-                BUF_SUMMARY,
-                summary.summary.trim(),
-                THEME.font_size_base,
-                [x, y],
-                [x, y, w, SUMMARY_H],
-                THEME.base_content,
-                0.0,
-            );
-            y += SUMMARY_H + 8.0;
-        }
         let names = self.model.table_names();
         if names.is_empty() {
             if bottom - y > 30.0 {
                 draw_text(
                     core,
                     BUF_SUMMARY + 1,
-                    "No lists yet. Your lists appear here once your first request is done.",
+                    if summary.pending.is_empty() {
+                        "No lists yet. Your lists appear here once your first request is done."
+                    } else {
+                        "Apply the pending changes to see your lists."
+                    },
                     THEME.font_size_base,
                     [x, y],
                     [x, y, w, 24.0],
