@@ -14,7 +14,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use akar_core::AkarCore;
-use akar_winit::process_window_event;
+use akar_winit::{process_window_event, set_presents_with_transaction};
 use clap::Parser;
 use wgpu::{
     CompositeAlphaMode, CurrentSurfaceTexture, InstanceDescriptor, PresentMode, TextureUsages,
@@ -120,89 +120,127 @@ impl ApplicationHandler for App {
         _id: winit::window::WindowId,
         event: WindowEvent,
     ) {
-        let Some(g) = &mut self.gfx else { return };
-        let scale = g.window.scale_factor();
+        if self.gfx.is_none() {
+            return;
+        }
 
         match &event {
             WindowEvent::CloseRequested => {
                 event_loop.exit();
                 return;
             }
+            // The drawing surface takes the new size at once, so draw a frame for it now instead
+            // of waiting for a later redraw: otherwise the compositor scales the last frame to
+            // the new bounds and text appears to stretch and shake while the window is dragged.
             WindowEvent::Resized(s) if s.width > 0 && s.height > 0 => {
-                g.config.width = s.width;
-                g.config.height = s.height;
-                g.surface.configure(&g.device, &g.config);
+                let (width, height) = (s.width, s.height);
+                if let Some(g) = &mut self.gfx {
+                    g.config.width = width;
+                    g.config.height = height;
+                    g.surface.configure(&g.device, &g.config);
+                    // On macOS this puts the frame in the resize's Core Animation transaction.
+                    set_presents_with_transaction(&g.surface, true);
+                }
+                self.redraw();
+                if let Some(g) = &self.gfx {
+                    set_presents_with_transaction(&g.surface, false);
+                }
             }
             // akar lays out in logical pixels, so pointer input must be logical too.
             WindowEvent::CursorMoved { position, .. } => {
-                let p: PhysicalPosition<f64> = *position;
-                g.core
-                    .input
-                    .set_mouse_pos((p.x / scale) as f32, (p.y / scale) as f32);
-                g.window.request_redraw();
+                if let Some(g) = &mut self.gfx {
+                    let p: PhysicalPosition<f64> = *position;
+                    let scale = g.window.scale_factor();
+                    g.core
+                        .input
+                        .set_mouse_pos((p.x / scale) as f32, (p.y / scale) as f32);
+                    g.window.request_redraw();
+                }
                 return;
             }
             WindowEvent::RedrawRequested => {
-                let size = g.window.inner_size();
-                if size.width == 0 || size.height == 0 {
-                    return;
+                self.redraw();
+                if let Some(g) = &self.gfx {
+                    g.window.request_redraw();
                 }
-                let scale = scale as f32;
-                let logical = [size.width as f32 / scale, size.height as f32 / scale];
-                let cursor_visible = (self.started.elapsed().as_millis() / 530).is_multiple_of(2);
-
-                g.core.begin_frame(size.width, size.height, scale);
-                self.view.render(&mut g.core, logical, cursor_visible);
-
-                let output = match g.surface.get_current_texture() {
-                    CurrentSurfaceTexture::Success(t) | CurrentSurfaceTexture::Suboptimal(t) => t,
-                    CurrentSurfaceTexture::Outdated | CurrentSurfaceTexture::Lost => {
-                        g.surface.configure(&g.device, &g.config);
-                        g.window.request_redraw();
-                        return;
-                    }
-                    _ => {
-                        g.window.request_redraw();
-                        return;
-                    }
-                };
-                let view = output
-                    .texture
-                    .create_view(&wgpu::TextureViewDescriptor::default());
-                let mut encoder = g
-                    .device
-                    .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-                {
-                    let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: Some("main pass"),
-                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view: &view,
-                            depth_slice: None,
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                                store: wgpu::StoreOp::Store,
-                            },
-                        })],
-                        depth_stencil_attachment: None,
-                        timestamp_writes: None,
-                        occlusion_query_set: None,
-                        multiview_mask: None,
-                    });
-                    let _ = g.core.end_frame(&g.device, &g.queue, &mut pass);
-                }
-                g.queue.submit(std::iter::once(encoder.finish()));
-                output.present();
-                // One-frame events (clicks, typed characters) are consumed by this frame.
-                g.core.input.begin_frame();
-                g.window.request_redraw();
                 return;
             }
             _ => {}
         }
 
-        process_window_event(&mut g.core.input, &event);
-        g.window.request_redraw();
+        if let Some(g) = &mut self.gfx {
+            process_window_event(&mut g.core.input, &event);
+            g.window.request_redraw();
+        }
+    }
+}
+
+impl App {
+    /// Draws and presents one frame. A frame is drawn even when no redraw was requested, so a
+    /// resize can present a correctly sized frame in the same transaction as the new bounds.
+    fn redraw(&mut self) {
+        let Some(g) = &mut self.gfx else { return };
+        let size = g.window.inner_size();
+        if size.width == 0 || size.height == 0 {
+            return;
+        }
+        // Resize events can lag behind the window's current bounds.
+        if g.config.width != size.width || g.config.height != size.height {
+            g.config.width = size.width;
+            g.config.height = size.height;
+            g.surface.configure(&g.device, &g.config);
+        }
+
+        let output = match g.surface.get_current_texture() {
+            CurrentSurfaceTexture::Success(t) | CurrentSurfaceTexture::Suboptimal(t) => t,
+            CurrentSurfaceTexture::Outdated | CurrentSurfaceTexture::Lost => {
+                g.surface.configure(&g.device, &g.config);
+                g.window.request_redraw();
+                return;
+            }
+            _ => {
+                g.window.request_redraw();
+                return;
+            }
+        };
+        // Draw at the size of the texture we present, not the one the window last reported.
+        let size = output.texture.size();
+        let scale = g.window.scale_factor() as f32;
+        let logical = [size.width as f32 / scale, size.height as f32 / scale];
+        let cursor_visible = (self.started.elapsed().as_millis() / 530).is_multiple_of(2);
+
+        g.core.begin_frame(size.width, size.height, scale);
+        self.view.render(&mut g.core, logical, cursor_visible);
+
+        let view = output
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+        let mut encoder = g
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+        {
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("main pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            let _ = g.core.end_frame(&g.device, &g.queue, &mut pass);
+        }
+        g.queue.submit(std::iter::once(encoder.finish()));
+        output.present();
+        // One-frame events (clicks, typed characters) are consumed by this frame.
+        g.core.input.begin_frame();
     }
 }
 
