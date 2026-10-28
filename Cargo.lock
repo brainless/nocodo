@@ -49,7 +49,7 @@ dependencies = [
 [[package]]
 name = "akar-components"
 version = "0.1.0"
-source = "git+https://github.com/brainless/akar#3ca7617d020be4f02113764ceaea996c0763cf44"
+source = "git+https://github.com/brainless/akar?branch=main#127fb99ba0c5d54a793375bdfe56bea9f8215b6d"
 dependencies = [
  "akar-core",
  "akar-layout",
@@ -60,7 +60,7 @@ dependencies = [
 [[package]]
 name = "akar-core"
 version = "0.1.0"
-source = "git+https://github.com/brainless/akar#3ca7617d020be4f02113764ceaea996c0763cf44"
+source = "git+https://github.com/brainless/akar?branch=main#127fb99ba0c5d54a793375bdfe56bea9f8215b6d"
 dependencies = [
  "bytemuck",
  "glam",
@@ -74,7 +74,7 @@ dependencies = [
 [[package]]
 name = "akar-layout"
 version = "0.1.0"
-source = "git+https://github.com/brainless/akar#3ca7617d020be4f02113764ceaea996c0763cf44"
+source = "git+https://github.com/brainless/akar?branch=main#127fb99ba0c5d54a793375bdfe56bea9f8215b6d"
 dependencies = [
  "akar-core",
  "glam",
@@ -85,7 +85,7 @@ dependencies = [
 [[package]]
 name = "akar-winit"
 version = "0.1.0"
-source = "git+https://github.com/brainless/akar#3ca7617d020be4f02113764ceaea996c0763cf44"
+source = "git+https://github.com/brainless/akar?branch=main#127fb99ba0c5d54a793375bdfe56bea9f8215b6d"
 dependencies = [
  "akar-core",
  "winit",

@@ -158,7 +158,7 @@ Dependencies and references are cloned locally. Read them instead of searching t
 |---|---|---|
 | **Rig** (0.43) | `~/Projects/rig/` (https://github.com/0xPlaygrounds/rig) | `crates/rig-core` (providers, completion), `crates/rig-agent/src/extractor.rs` (typed output), `crates/rig-cassette` (record/replay) |
 | **Diesel** (2.3) | `~/Projects/diesel/` (https://github.com/diesel-rs/diesel) | `diesel_migrations/src/file_based_migrations.rs` (runtime migrations), `diesel_dynamic_schema/` (queries on runtime-defined tables), SQLite backend |
-| **akar** | `~/Projects/akar/` (https://github.com/brainless/akar) | Reference for epic format and workspace/toolchain conventions. `nocodo-gui` uses its crates as git dependencies, not path dependencies. |
+| **akar** | `~/Projects/akar/` (https://github.com/brainless/akar) | Reference for epic format and workspace/toolchain conventions. `nocodo-gui` uses its crates as git dependencies, not path dependencies: `branch = "main"`, with the commit pinned in `Cargo.lock`. Bump with `cargo update -p akar-core` (one `-p` moves all four, they share the git source), then commit the lock. |
 | **protopie** | `~/Projects/protopie/` (https://github.com/brainless/protopie) | Model for the GUI shell (`crates/protopie-gui`: winit + wgpu, `ureq` client, spawned server) |
 
 ## What NOT to do
